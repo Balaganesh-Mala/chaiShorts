@@ -4,10 +4,10 @@ import jwt from "jsonwebtoken";
 
 // Helper: Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id, role: "user" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
-// ✅ 1️⃣ Register User (Free by default)
+// ✅ 1️⃣ Register User (Free plan by default)
 export const registerUser = async (req, res) => {
   try {
     const { firstName, lastName, email, mobileNumber, password, confirmPassword } = req.body;
@@ -18,8 +18,8 @@ export const registerUser = async (req, res) => {
     if (password !== confirmPassword)
       return res.status(400).json({ success: false, message: "Passwords do not match" });
 
-    const existing = await User.findOne({ email });
-    if (existing)
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
       return res.status(400).json({ success: false, message: "Email already registered" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -35,7 +35,6 @@ export const registerUser = async (req, res) => {
     });
 
     await user.save();
-
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -44,7 +43,8 @@ export const registerUser = async (req, res) => {
       token,
       data: {
         id: user._id,
-        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         mobileNumber: user.mobileNumber,
         subscriptionType: user.subscriptionType,
@@ -60,21 +60,20 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password)
-      return res.status(400).json({ success: false, message: "Email and password required" });
+      return res.status(400).json({ success: false, message: "Email and password are required" });
 
     const user = await User.findOne({ email });
-    if (!user)
-      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    if (!user) return res.status(401).json({ success: false, message: "Invalid email or password" });
+
+    if (user.status === "blocked")
+      return res.status(403).json({ success: false, message: "Your account is blocked" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(401).json({ success: false, message: "Invalid email or password" });
 
     const token = generateToken(user._id);
-
-    // update last login
     user.lastLogin = new Date();
     await user.save();
 
@@ -84,7 +83,8 @@ export const loginUser = async (req, res) => {
       token,
       user: {
         id: user._id,
-        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         subscriptionType: user.subscriptionType,
         isSubscribed: user.isSubscribed,
@@ -95,12 +95,11 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// ✅ 3️⃣ Get User Profile (Authenticated)
+// ✅ 3️⃣ Get User Profile
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
-    if (!user)
-      return res.status(404).json({ success: false, message: "User not found" });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -114,7 +113,8 @@ export const upgradeSubscription = async (req, res) => {
     const user = await User.findById(req.user.id);
 
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (type !== "premium") return res.status(400).json({ success: false, message: "Invalid subscription type" });
+    if (type !== "premium")
+      return res.status(400).json({ success: false, message: "Invalid subscription type" });
 
     const startDate = new Date();
     const endDate = new Date();

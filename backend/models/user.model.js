@@ -4,7 +4,6 @@ const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
-    fullName: { type: String },
     email: { type: String, unique: true, required: true },
     mobileNumber: { type: String },
     password: { type: String, required: true },
@@ -16,10 +15,7 @@ const userSchema = new mongoose.Schema(
       enum: ["free", "premium"],
       default: "free",
     },
-    isSubscribed: {
-      type: Boolean,
-      default: false,
-    },
+    isSubscribed: { type: Boolean, default: false },
     subscriptionStart: { type: Date },
     subscriptionEnd: { type: Date },
 
@@ -32,9 +28,8 @@ const userSchema = new mongoose.Schema(
 );
 
 // Auto-generate fullName
-userSchema.pre("save", function (next) {
-  this.fullName = `${this.firstName} ${this.lastName}`;
-  next();
+userSchema.virtual("fullName").get(function () {
+  return `${this.firstName} ${this.lastName}`;
 });
 
 const User = mongoose.model("User", userSchema);

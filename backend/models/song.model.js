@@ -14,6 +14,15 @@ const songSchema = new mongoose.Schema(
     songUrl: { type: String, required: true },
     thumbnailUrl: { type: String },
     addedBy: { type: String },
+
+    // 🟢 Linked videos for the song
+    linkedVideos: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video", // Must match your video model name
+      },
+    ],
+
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     isFeatured: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },

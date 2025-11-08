@@ -1,112 +1,89 @@
 import User from "../models/user.model.js";
-import bcrypt from "bcryptjs";
 
-// ✅ Register new user
+/**
+ * ✅ Get all users (Admin only)
+ */
 export const registerUser = async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      username,
-      email,
-      mobileNumber,
-      gender,
-      country,
-      password,
-      confirmPassword,
-    } = req.body;
+    const { firstName, lastName, email, mobileNumber, password } = req.body;
 
-    // Validation
-    if (!firstName || !lastName || !username || !email || !password || !confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "All required fields must be filled",
-      });
-    }
+    if (!firstName || !lastName || !email || !password)
+      return res.status(400).json({ success: false, message: "All fields are required" });
 
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Passwords do not match",
-      });
-    }
+    const existing = await User.findOne({ email });
+    if (existing)
+      return res.status(400).json({ success: false, message: "Email already registered" });
 
-    // Check duplicates
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail)
-      return res.status(400).json({ success: false, message: "Email already exists" });
-
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername)
-      return res.status(400).json({ success: false, message: "Username already taken" });
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const user = new User({
       firstName,
       lastName,
-      username,
       email,
       mobileNumber,
-      gender,
-      country,
       password: hashedPassword,
+      subscriptionType: "free",
+      isSubscribed: false,
     });
 
     await user.save();
-
-    // Return success response
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "User added successfully by admin",
       data: {
         id: user._id,
-        fullName: user.fullName,
-        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
-        gender: user.gender,
-        country: user.country,
-        status: user.status,
-        dateOfRegistration: user.dateOfRegistration,
       },
     });
   } catch (error) {
-    console.error("Register Error:", error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// ✅ Get all users with filters
 export const getAllUsers = async (req, res) => {
   try {
-    const { gender, country, status } = req.query;
+    const { subscriptionType, status, search } = req.query;
     const filter = {};
-    if (gender) filter.gender = gender;
-    if (country) filter.country = country;
+
+    if (subscriptionType) filter.subscriptionType = subscriptionType;
     if (status) filter.status = status;
+    if (search)
+      filter.$or = [
+        { firstName: new RegExp(search, "i") },
+        { lastName: new RegExp(search, "i") },
+        { email: new RegExp(search, "i") },
+      ];
 
     const users = await User.find(filter).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: users });
+    res.status(200).json({
+      success: true,
+      total: users.length,
+      data: users,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Get user by ID
+/**
+ * ✅ Get single user by ID
+ */
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).select("-password");
     if (!user)
       return res.status(404).json({ success: false, message: "User not found" });
+
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Block / Unblock user
+/**
+ * ✅ Block or Unblock user
+ */
 export const toggleUserStatus = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -118,21 +95,23 @@ export const toggleUserStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `User ${
-        user.status === "active" ? "unblocked" : "blocked"
-      } successfully`,
+      message: `User ${user.status === "active" ? "unblocked" : "blocked"} successfully`,
+      data: { id: user._id, status: user.status },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Delete user
+/**
+ * ✅ Delete user (Admin only)
+ */
 export const deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user)
       return res.status(404).json({ success: false, message: "User not found" });
+
     res.status(200).json({ success: true, message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
