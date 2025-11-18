@@ -4,16 +4,34 @@ const movieSchema = new mongoose.Schema(
   {
     movieName: { type: String, required: true },
     directorName: { type: String },
-    castNames: [String],
+    cast: { type: String }, 
     releaseYear: { type: Number },
+    
     language: { type: String },
     description: { type: String },
+
+    // ✅ Movie Poster / Banner
     posterUrl: { type: String },
     bannerUrl: { type: String },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
-    addedBy: { type: String },
+
+    // ✅ To show songs linked to movie
+    linkedSongs: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Song",
+      }
+    ],
+
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
+
+    addedBy: { type: String }
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Movie", movieSchema);
+const Movie = mongoose.model("Movie", movieSchema);
+export default Movie;

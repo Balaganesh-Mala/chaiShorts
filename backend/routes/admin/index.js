@@ -8,6 +8,7 @@ import categoriesRoutes from "./categories.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import settingsRoutes from "./settings.routes.js";
 import logsRoutes from "./logs.routes.js";
+import moviesRoutes from "./movies.routes.js";
 
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.use("/categories", categoriesRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/logs", logsRoutes);
+router.use("/movies", moviesRoutes);
 
 router.get("/", (req, res) => res.send("Admin routes working"));
 

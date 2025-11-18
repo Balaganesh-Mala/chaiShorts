@@ -26,5 +26,11 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Auto-generate fullName
+userSchema.virtual("fullName").get(function () {
+  return `${this.firstName} ${this.lastName}`;
+});
+
 const User = mongoose.model("User", userSchema);
 export default User;

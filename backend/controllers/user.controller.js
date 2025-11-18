@@ -1,8 +1,5 @@
 import User from "../models/user.model.js";
 
-/**
- * ✅ Get all users (Admin only)
- */
 export const registerUser = async (req, res) => {
   try {
     const { firstName, lastName, email, mobileNumber, password } = req.body;

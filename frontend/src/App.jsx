@@ -9,6 +9,7 @@ import Songs from "./pages/Songs";
 import Videos from "./pages/Videos";
 import Categories from "./pages/Categories";
 import Users from "./pages/Users";
+import Movies from "./pages/Movies.jsx";
 
 const App = () => {
   return (
@@ -44,6 +45,16 @@ const App = () => {
               <ProtectedRoute>
                 <AdminLayout>
                   <Videos />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/movies"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <Movies />
                 </AdminLayout>
               </ProtectedRoute>
             }

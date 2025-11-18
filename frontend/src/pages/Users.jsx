@@ -72,11 +72,11 @@ const Users = () => {
             <tr>
               <th className="p-3 border">Name</th>
               <th className="p-3 border">Email</th>
-              <th className="p-3 border">Gender</th>
-              <th className="p-3 border">Country</th>
+              <th className="p-3 border">Phone Number</th>
+              <th className="p-3 border">Subscription Type</th>
               <th className="p-3 border">Status</th>
               <th className="p-3 border">Registered</th>
-              <th className="p-3 border">Last Login</th>
+              {/*<th className="p-3 border">Last Login</th>*/}
               <th className="p-3 border">Actions</th>
             </tr>
           </thead>
@@ -84,10 +84,10 @@ const Users = () => {
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
                 <tr key={user._id} className="border-t">
-                  <td className="p-3">{user.fullName}</td>
+                  <td className="p-3">{user.firstName + " " + user.lastName}</td>
                   <td className="p-3">{user.email}</td>
-                  <td className="p-3">{user.gender || "-"}</td>
-                  <td className="p-3">{user.country || "-"}</td>
+                  <td className="p-3">{user.mobileNumber || "-"}</td>
+                  <td className="p-3">{user.subscriptionType || "-"}</td>
                   <td className="p-3">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -102,11 +102,11 @@ const Users = () => {
                   <td className="p-3">
                     {new Date(user.dateOfRegistration).toLocaleDateString()}
                   </td>
-                  <td className="p-3">
+                  {/*<td className="p-3">
                     {user.lastLogin
                       ? new Date(user.lastLogin).toLocaleDateString()
                       : "—"}
-                  </td>
+                  </td>*/}
                   <td className="p-3 flex gap-2">
                     <button
                       onClick={() => toggleStatus(user._id, user.status)}

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import API from "../api/apiClient";
 import toast from "react-hot-toast";
+import Swal from "sweetalert2";
+import { Circles } from "react-loader-spinner";
 
 const Songs = () => {
   const [songs, setSongs] = useState([]);
@@ -12,9 +14,14 @@ const Songs = () => {
   const [pages, setPages] = useState(1);
   const [sortBy, setSortBy] = useState("createdAt");
   const [order, setOrder] = useState("desc");
-  const [limit] = useState(10); // songs per page
+  const [limit] = useState(10);
 
   const [showForm, setShowForm] = useState(false);
+
+  // Uploading States
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+
   const [formData, setFormData] = useState({
     songName: "",
     authorName: "",
@@ -30,7 +37,7 @@ const Songs = () => {
     status: "active",
   });
 
-  // ✅ Fetch songs from backend
+  // Fetch songs
   const loadSongs = async () => {
     setLoading(true);
     try {
@@ -58,11 +65,14 @@ const Songs = () => {
     loadSongs();
   }, [page, search, category, movie, sortBy, order]);
 
-  // ✅ Handle file uploads
-  const uploadFile = async (file, folder) => {
+  // File Upload Function
+  const uploadFile = async (file, folder, setLoader) => {
+    setLoader(true);
+
     const form = new FormData();
     form.append("file", file);
     form.append("folder", folder);
+
     try {
       const res = await API.post("/admin/upload", form, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -71,16 +81,25 @@ const Songs = () => {
     } catch {
       toast.error("Upload failed");
       return "";
+    } finally {
+      setLoader(false);
     }
   };
 
-  // ✅ Add Song
+  // Add Song
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (uploadingAudio || uploadingThumbnail) {
+      return toast.error("Please wait, file is still uploading...");
+    }
+
     try {
       await API.post("/admin/songs", formData);
-      toast.success("Song added!");
+
+      Swal.fire("Success!", "Song added successfully!", "success");
       setShowForm(false);
+
       setFormData({
         songName: "",
         authorName: "",
@@ -95,27 +114,39 @@ const Songs = () => {
         thumbnailUrl: "",
         status: "active",
       });
+
       loadSongs();
     } catch {
-      toast.error("Failed to save song");
+      Swal.fire("Error", "Failed to save song", "error");
     }
   };
 
-  // ✅ Delete song
+  // Delete Song
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure?")) return;
+    const confirm = await Swal.fire({
+      title: "Are you sure?",
+      text: "This song will be permanently deleted!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete!",
+    });
+
+    if (!confirm.isConfirmed) return;
+
     try {
       await API.delete(`/admin/songs/${id}`);
-      toast.success("Deleted successfully");
+      Swal.fire("Deleted!", "Song removed successfully.", "success");
       loadSongs();
     } catch {
-      toast.error("Delete failed");
+      Swal.fire("Error", "Delete failed", "error");
     }
   };
 
   return (
     <div>
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-semibold text-gray-800">Songs Management</h2>
 
@@ -127,6 +158,7 @@ const Songs = () => {
             onChange={(e) => setSearch(e.target.value)}
             className="border p-2 rounded-md"
           />
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -136,13 +168,14 @@ const Songs = () => {
             <option value="totalPlays">Most Played</option>
             <option value="totalLikes">Most Liked</option>
           </select>
+
           <select
             value={order}
             onChange={(e) => setOrder(e.target.value)}
             className="border p-2 rounded-md"
           >
-            <option value="desc">Descending</option>
-            <option value="asc">Ascending</option>
+            <option value="desc">Desc</option>
+            <option value="asc">Asc</option>
           </select>
 
           <button
@@ -169,6 +202,7 @@ const Songs = () => {
             }
             className="border p-2 rounded-md"
           />
+
           <input
             type="text"
             placeholder="Singer Name"
@@ -178,6 +212,7 @@ const Songs = () => {
             }
             className="border p-2 rounded-md"
           />
+
           <input
             type="text"
             placeholder="Category"
@@ -187,39 +222,75 @@ const Songs = () => {
             }
             className="border p-2 rounded-md"
           />
+
+          {/* Thumbnail Upload */}
           <div>
             <label className="block text-sm mb-1">Thumbnail</label>
+
             <input
               type="file"
               onChange={async (e) => {
-                const url = await uploadFile(e.target.files[0], "thumbnails");
+                const url = await uploadFile(
+                  e.target.files[0],
+                  "thumbnails",
+                  setUploadingThumbnail
+                );
                 setFormData({ ...formData, thumbnailUrl: url });
               }}
             />
+
+            {uploadingThumbnail && (
+              <div className="flex items-center gap-2 mt-2 text-blue-600">
+                <Circles height="25" width="25" color="#2563eb" />
+                <span>Uploading Thumbnail...</span>
+              </div>
+            )}
           </div>
+
+          {/* Audio Upload */}
           <div>
             <label className="block text-sm mb-1">Song File</label>
+
             <input
               type="file"
               accept="audio/*"
               onChange={async (e) => {
-                const url = await uploadFile(e.target.files[0], "songs");
+                const url = await uploadFile(
+                  e.target.files[0],
+                  "songs",
+                  setUploadingAudio
+                );
                 setFormData({ ...formData, songUrl: url });
               }}
             />
+
+            {uploadingAudio && (
+              <div className="flex items-center gap-2 mt-2 text-green-600">
+                <Circles height="25" width="25" color="#16a34a" />
+                <span>Uploading Audio...</span>
+              </div>
+            )}
           </div>
+
           <button
             type="submit"
-            className="col-span-2 bg-green-600 text-white py-2 rounded-md hover:bg-green-700"
+            disabled={uploadingAudio || uploadingThumbnail}
+            className={`col-span-2 py-2 rounded-md text-white font-medium 
+              ${uploadingAudio || uploadingThumbnail
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
+              }`}
           >
-            Save Song
+            {uploadingAudio || uploadingThumbnail ? "Uploading..." : "Save Song"}
           </button>
         </form>
       )}
 
       {/* Songs Table */}
       {loading ? (
-        <p>Loading...</p>
+        <div className="flex justify-center items-center py-20">
+          <Circles height="60" width="60" color="#2563eb" />
+        </div>
       ) : songs.length === 0 ? (
         <p className="text-gray-500">No songs found.</p>
       ) : (
@@ -236,6 +307,7 @@ const Songs = () => {
                 <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {songs.map((song) => (
                 <tr key={song._id} className="border-b hover:bg-gray-50">
@@ -245,9 +317,11 @@ const Songs = () => {
                       className="w-12 h-12 rounded-md object-cover"
                     />
                   </td>
+
                   <td className="p-3 font-medium">{song.songName}</td>
                   <td className="p-3">{song.totalPlays}</td>
                   <td className="p-3">{song.totalLikes}</td>
+
                   <td className="p-3">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -259,9 +333,11 @@ const Songs = () => {
                       {song.status}
                     </span>
                   </td>
+
                   <td className="p-3">
                     <audio controls src={song.songUrl} className="w-32" />
                   </td>
+
                   <td className="p-3 flex justify-center gap-3">
                     <button
                       onClick={() => handleDelete(song._id)}
@@ -286,6 +362,7 @@ const Songs = () => {
         >
           Prev
         </button>
+
         {[...Array(pages).keys()].map((p) => (
           <button
             key={p}
@@ -297,6 +374,7 @@ const Songs = () => {
             {p + 1}
           </button>
         ))}
+
         <button
           disabled={page === pages}
           onClick={() => setPage(page + 1)}

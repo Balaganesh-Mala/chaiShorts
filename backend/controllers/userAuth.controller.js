@@ -7,7 +7,7 @@ const generateToken = (id) => {
   return jwt.sign({ id, role: "user" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
-// ✅ 1️⃣ Register User (Free plan by default)
+// Register User (Free plan by default)
 export const registerUser = async (req, res) => {
   try {
     const { firstName, lastName, email, mobileNumber, password, confirmPassword } = req.body;
