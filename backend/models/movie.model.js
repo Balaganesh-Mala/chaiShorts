@@ -4,22 +4,22 @@ const movieSchema = new mongoose.Schema(
   {
     movieName: { type: String, required: true },
     directorName: { type: String },
-    cast: { type: String }, 
+    // store cast as array of strings (more flexible)
+    cast: [{ type: String }],
+
     releaseYear: { type: Number },
-    
     language: { type: String },
     description: { type: String },
 
-    // ✅ Movie Poster / Banner
     posterUrl: { type: String },
     bannerUrl: { type: String },
 
-    // ✅ To show songs linked to movie
+    // Songs belonging to this movie (ObjectId refs)
     linkedSongs: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Song",
-      }
+      },
     ],
 
     status: {
@@ -28,7 +28,7 @@ const movieSchema = new mongoose.Schema(
       default: "active",
     },
 
-    addedBy: { type: String }
+    addedBy: { type: String },
   },
   { timestamps: true }
 );

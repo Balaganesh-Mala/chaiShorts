@@ -1,25 +1,74 @@
+// controllers/songs.controller.js
+import mongoose from "mongoose";
 import Song from "../models/song.model.js";
+import Movie from "../models/movie.model.js";
 import { createLog } from "../services/logger.service.js";
 
 /**
- * ✅ Create a new Song
- * Only Admin / Superadmin can create songs
+ * CREATE SONG
  */
 export const createSong = async (req, res) => {
   try {
-    const { linkedVideos } = req.body;
+    const {
+      linkedVideos = [],
+      movieId = null,
+      songName,
+      songUrl,
+      thumbnailUrl,
+      categoryName,
+      singerName,
+      authorName,
+      description,
+      duration,
+      language,
+      genre,
+      status,
+    } = req.body;
 
-    const song = new Song({
-      ...req.body,
-      addedBy: req.user.email,
-      linkedVideos: linkedVideos || [],
+    if (!songName || !songUrl) {
+      return res
+        .status(400)
+        .json({ success: false, message: "songName and songUrl are required" });
+    }
+
+    // Validate movieId (if provided)
+    if (movieId) {
+      if (!mongoose.Types.ObjectId.isValid(movieId)) {
+        return res.status(400).json({ success: false, message: "Invalid movieId" });
+      }
+
+      const exists = await Movie.findById(movieId);
+      if (!exists) {
+        return res.status(400).json({ success: false, message: "Invalid movieId" });
+      }
+    }
+
+    const song = await Song.create({
+      songName,
+      songUrl,
+      thumbnailUrl,
+      categoryName,
+      singerName,
+      authorName,
+      description,
+      duration,
+      language,
+      genre,
+      status,
+      linkedVideos,
+      movieId: movieId || null,
+      addedBy: req.user?.email || "admin",
     });
 
-    await song.save();
+    // Add to movie linkedSongs
+    if (movieId) {
+      await Movie.findByIdAndUpdate(movieId, {
+        $addToSet: { linkedSongs: song._id },
+      });
+    }
 
-    // Log admin action
     await createLog({
-      adminEmail: req.user.email,
+      adminEmail: req.user?.email,
       action: "Created new song",
       module: "Songs",
       targetId: song._id,
@@ -27,59 +76,71 @@ export const createSong = async (req, res) => {
       req,
     });
 
+    const populated = await Song.findById(song._id).populate(
+      "movieId",
+      "movieName posterUrl releaseYear"
+    );
+
     res.status(201).json({
       success: true,
       message: "Song created successfully",
-      data: song,
+      data: populated,
     });
   } catch (error) {
-    console.error("Error creating song:", error);
-    await createLog({
-      adminEmail: req.user.email,
-      action: "Failed to create song",
-      module: "Songs",
-      status: "failed",
-      req,
-    });
-    res.status(500).json({
-      success: false,
-      message: "Server error while creating song",
-      error: error.message,
-    });
+    console.error("createSong error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-
-// ✅ Get all songs with optional linked video details
+/**
+ * GET ALL SONGS (supports search, filters, pagination, movieId filter)
+ */
 export const getAllSongs = async (req, res) => {
   try {
     const {
       search,
       category,
-      movie,
-      sortBy,
-      order,
-      page = 1,
-      limit = 10,
+      movieId: rawMovieId,
+      sortBy = "createdAt",
+      order = "desc",
+      page: rawPage = "1",
+      limit: rawLimit = "10",
       includeVideos,
     } = req.query;
 
-    const filter = {};
-    if (search) filter.songName = { $regex: search, $options: "i" };
-    if (category) filter.categoryName = category;
-    if (movie) filter.movieName = movie;
-
-    const sortField = sortBy || "createdAt";
+    const page = Math.max(1, parseInt(rawPage, 10) || 1);
+    const limit = Math.max(1, parseInt(rawLimit, 10) || 10);
     const sortOrder = order === "asc" ? 1 : -1;
 
+    const filter = {};
+
+    // text search
+    if (search) filter.songName = { $regex: search, $options: "i" };
+
+    // category filter
+    if (category) filter.categoryName = category;
+
+    // movie filter
+    const movieId = rawMovieId || req.query.movie || null;
+
+    if (movieId) {
+      if (!mongoose.Types.ObjectId.isValid(movieId)) {
+        return res.status(400).json({ success: false, message: "Invalid movieId" });
+      }
+      filter.movieId = movieId;
+    }
+
     const total = await Song.countDocuments(filter);
+
+    const allowedSort = ["createdAt", "totalPlays", "totalLikes", "songName"];
+    const sortField = allowedSort.includes(sortBy) ? sortBy : "createdAt";
 
     let query = Song.find(filter)
       .sort({ [sortField]: sortOrder })
       .skip((page - 1) * limit)
-      .limit(Number(limit));
+      .limit(limit)
+      .populate("movieId", "movieName posterUrl releaseYear");
 
-    // ✅ Populate linked videos when includeVideos=true
     if (includeVideos === "true") {
       query = query.populate(
         "linkedVideos",
@@ -92,82 +153,117 @@ export const getAllSongs = async (req, res) => {
     res.status(200).json({
       success: true,
       total,
-      page: Number(page),
+      page,
       pages: Math.ceil(total / limit),
       data: songs,
     });
   } catch (error) {
-    console.error("Error fetching songs:", error);
+    console.error("getAllSongs error:", error);
     res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-
-// ✅ Get single song (with video details)
-export const getSongById = async (req, res) => {
-  try {
-    const song = await Song.findById(req.params.id).populate(
-      "linkedVideos",
-      "videoTitle videoUrl thumbnailUrl duration viewsCount likesCount status"
-    );
-
-    if (!song)
-      return res.status(404).json({ success: false, message: "Song not found" });
-
-    res.status(200).json({ success: true, data: song });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-export const updateSong = async (req, res) => {
-  try {
-    const { linkedVideos } = req.body;
-
-    const updatedData = {
-      ...req.body,
-      linkedVideos: linkedVideos || [],
-      updatedAt: Date.now(),
-    };
-
-    const song = await Song.findByIdAndUpdate(req.params.id, updatedData, {
-      new: true,
-    }).populate(
-      "linkedVideos",
-      "videoTitle videoUrl thumbnailUrl viewsCount likesCount status"
-    );
-
-    if (!song) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Song not found" });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Song updated successfully",
-      data: song,
-    });
-  } catch (error) {
-    console.error("Error updating song:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update song",
-      error: error.message,
-    });
   }
 };
 
 /**
- * ✅ Delete Song (Superadmin only)
+ * GET SONG BY ID
+ */
+export const getSongById = async (req, res) => {
+  try {
+    const song = await Song.findById(req.params.id)
+      .populate(
+        "linkedVideos",
+        "videoTitle videoUrl thumbnailUrl duration viewsCount likesCount status"
+      )
+      .populate("movieId", "movieName posterUrl releaseYear");
+
+    if (!song) {
+      return res.status(404).json({ success: false, message: "Song not found" });
+    }
+
+    res.status(200).json({ success: true, data: song });
+  } catch (error) {
+    console.error("getSongById error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * UPDATE SONG
+ */
+export const updateSong = async (req, res) => {
+  try {
+    const songId = req.params.id;
+    const { linkedVideos = [], movieId = null } = req.body;
+
+    const oldSong = await Song.findById(songId);
+    if (!oldSong) {
+      return res.status(404).json({ success: false, message: "Song not found" });
+    }
+
+    // Validate new movieId
+    if (movieId) {
+      if (!mongoose.Types.ObjectId.isValid(movieId)) {
+        return res.status(400).json({ success: false, message: "Invalid movieId" });
+      }
+      const exists = await Movie.findById(movieId);
+      if (!exists) {
+        return res.status(400).json({ success: false, message: "Invalid movieId" });
+      }
+    }
+
+    const updated = await Song.findByIdAndUpdate(
+      songId,
+      { ...req.body, linkedVideos, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    // Sync movie link
+    const oldMovie = oldSong.movieId?.toString() || null;
+    const newMovie = movieId || null;
+
+    if (oldMovie !== newMovie) {
+      if (oldMovie) {
+        await Movie.findByIdAndUpdate(oldMovie, {
+          $pull: { linkedSongs: songId },
+        });
+      }
+      if (newMovie) {
+        await Movie.findByIdAndUpdate(newMovie, {
+          $addToSet: { linkedSongs: songId },
+        });
+      }
+    }
+
+    const populated = await Song.findById(songId).populate(
+      "movieId",
+      "movieName posterUrl releaseYear"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Song updated successfully",
+      data: populated,
+    });
+  } catch (error) {
+    console.error("updateSong error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE SONG
  */
 export const deleteSong = async (req, res) => {
   try {
     const song = await Song.findByIdAndDelete(req.params.id);
+
     if (!song) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Song not found" });
+      return res.status(404).json({ success: false, message: "Song not found" });
+    }
+
+    if (song.movieId) {
+      await Movie.findByIdAndUpdate(song.movieId, {
+        $pull: { linkedSongs: song._id },
+      });
     }
 
     res.status(200).json({
@@ -175,11 +271,7 @@ export const deleteSong = async (req, res) => {
       message: "Song deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting song:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete song",
-      error: error.message,
-    });
+    console.error("deleteSong error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

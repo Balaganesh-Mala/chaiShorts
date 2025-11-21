@@ -1,6 +1,7 @@
 import express from "express";
 import authRoutes from "./auth.routes.js";
 import songsRoutes from "./songs.routes.js";
+import moviesRoutes from "./movies.routes.js";
 import uploadRoutes from "./upload.routes.js";
 import usersRoutes from "./users.routes.js";
 import videosRoutes from "./videos.routes.js";
@@ -8,8 +9,6 @@ import categoriesRoutes from "./categories.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import settingsRoutes from "./settings.routes.js";
 import logsRoutes from "./logs.routes.js";
-import moviesRoutes from "./movies.routes.js";
-
 
 const router = express.Router();
 

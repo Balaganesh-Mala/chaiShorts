@@ -6,20 +6,27 @@ const songSchema = new mongoose.Schema(
     authorName: { type: String },
     singerName: { type: String },
     categoryName: { type: String },
-    movieName: { type: String },
+
+    // Relationship to Movie
+    movieId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Movie",
+      default: null,
+    },
+
     description: { type: String },
     duration: { type: String },
     language: { type: String },
     genre: { type: String },
+
     songUrl: { type: String, required: true },
     thumbnailUrl: { type: String },
     addedBy: { type: String },
 
-    // 🟢 Linked videos for the song
     linkedVideos: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Video", // Must match your video model name
+        ref: "Video",
       },
     ],
 

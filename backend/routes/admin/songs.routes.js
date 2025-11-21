@@ -12,7 +12,6 @@ import { authorize } from "../../middlewares/role.middleware.js";
 
 const router = express.Router();
 
-// 🟢 Routes
 router.post("/", auth, authorize(["admin", "superadmin"]), createSong);
 router.get("/", auth, authorize(["admin", "superadmin", "editor"]), getAllSongs);
 router.get("/:id", auth, authorize(["admin", "superadmin", "editor"]), getSongById);

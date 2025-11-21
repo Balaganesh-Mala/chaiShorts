@@ -1,323 +1,279 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../api/apiClient";
-import { Trash2, Edit, Plus, ArrowLeft } from "lucide-react";
 
-export default function Movie() {
-  const [mode, setMode] = useState("list"); // list | add | edit
-  const [movies, setMovies] = useState([]);
-  const [songs, setSongs] = useState([]);
-  const [search, setSearch] = useState("");
-  const [language, setLanguage] = useState("");
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-
-  const [movie, setMovie] = useState({
+const Movie = () => {
+  const defaultMovieState = {
     movieName: "",
-    directorName: "",
-    cast: "",
-    language: "",
-    releaseYear: "",
-    description: "",
     posterUrl: "",
     bannerUrl: "",
+    publishedYear: "",
+    genre: "",
+    cast: "",
+    description: "",
     linkedSongs: [],
-  });
-
-  const [editId, setEditId] = useState(null);
-
-  // ✅ Fetch Movies
-  const fetchMovies = async () => {
-    setLoading(true);
-    const res = await API.get(
-      `/admin/movies?search=${search}&language=${language}&page=${page}`
-    );
-    setMovies(res.data.data);
-    setPages(res.data.pages);
-    setLoading(false);
   };
 
-  // ✅ Fetch Songs (for dropdown)
+  const [movies, setMovies] = useState([]);
+  const [songs, setSongs] = useState([]);
+  const [movie, setMovie] = useState(defaultMovieState);
+  const [mode, setMode] = useState("list");
+  const [editId, setEditId] = useState(null);
+
+  const fetchMovies = async () => {
+    const res = await API.get("/admin/movies");
+    setMovies(res.data.data || []);
+    console.log(res.data)
+  };
+
   const fetchSongs = async () => {
     const res = await API.get("/admin/songs");
-    setSongs(res.data.data);
+    setSongs(res.data.data || []);
   };
 
   useEffect(() => {
     fetchMovies();
     fetchSongs();
-  }, [search, language, page]);
+  }, []);
 
-  // ✅ Upload image
+  const resetForm = () => {
+    setMovie(defaultMovieState);
+    setMode("list");
+    setEditId(null);
+  };
+
+  const handleChange = (e) => {
+    setMovie({ ...movie, [e.target.name]: e.target.value });
+  };
+
+  const handleSongSelect = (e) => {
+    setMovie({
+      ...movie,
+      linkedSongs: [...e.target.selectedOptions].map((o) => o.value),
+    });
+  };
+
   const uploadImage = async (file, field) => {
-    const formData = new FormData();
-    formData.append("file", file);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("folder", "movies");
 
-    const res = await API.post("/admin/upload", formData);
+    const res = await API.post("/admin/upload", form);
+
     setMovie({ ...movie, [field]: res.data.fileUrl });
   };
 
-  // ✅ Add Movie
+  const handleFileChange = (e, field) => {
+    const file = e.target.files[0];
+    if (file) uploadImage(file, field);
+  };
+
+  const loadMovie = async (id) => {
+    const res = await API.get(`/admin/movies/${id}`);
+    const movieData = res.data.data;
+
+    setMovie({
+      ...movieData,
+      linkedSongs: movieData.linkedSongs?.map((s) => s._id) || [],
+    });
+
+    setMode("edit");
+    setEditId(id);
+  };
+
   const addMovie = async (e) => {
     e.preventDefault();
     await API.post("/admin/movies", movie);
-    resetForm();
     fetchMovies();
-    setMode("list");
+    resetForm();
   };
 
-  // ✅ Load movie into form for editing
-  const loadMovie = async (id) => {
-    const res = await API.get(`/admin/movies/${id}`);
-    setMovie(res.data.data);
-    setEditId(id);
-    setMode("edit");
-  };
-
-  // ✅ Update Movie
   const updateMovie = async (e) => {
     e.preventDefault();
     await API.put(`/admin/movies/${editId}`, movie);
-    resetForm();
     fetchMovies();
-    setMode("list");
+    resetForm();
   };
 
-  // ✅ Delete Movie
   const deleteMovie = async (id) => {
     if (!window.confirm("Are you sure?")) return;
     await API.delete(`/admin/movies/${id}`);
     fetchMovies();
   };
 
-  const resetForm = () => {
-    setMovie({
-      movieName: "",
-      directorName: "",
-      cast: "",
-      language: "",
-      releaseYear: "",
-      description: "",
-      posterUrl: "",
-      bannerUrl: "",
-      linkedSongs: [],
-    });
-    setEditId(null);
-  };
-
-  // ✅ Movie Form Component (Add / Edit)
-  const MovieForm = ({ title, onSubmit }) => (
-    <form onSubmit={onSubmit} className="bg-white p-6 rounded-lg shadow grid gap-4">
-      <h2 className="text-xl font-bold mb-2">{title}</h2>
-
-      <input
-        className="border p-2 rounded"
-        placeholder="Movie Name"
-        value={movie.movieName}
-        onChange={(e) => setMovie({ ...movie, movieName: e.target.value })}
-        required
-      />
-
-      <input
-        className="border p-2 rounded"
-        placeholder="Director Name"
-        value={movie.directorName}
-        onChange={(e) => setMovie({ ...movie, directorName: e.target.value })}
-      />
-
-      <input
-        className="border p-2 rounded"
-        placeholder="Cast"
-        value={movie.cast}
-        onChange={(e) => setMovie({ ...movie, cast: e.target.value })}
-      />
-
-      <input
-        className="border p-2 rounded"
-        placeholder="Language"
-        value={movie.language}
-        onChange={(e) => setMovie({ ...movie, language: e.target.value })}
-      />
-
-      <input
-        type="number"
-        className="border p-2 rounded"
-        placeholder="Release Year"
-        value={movie.releaseYear}
-        onChange={(e) => setMovie({ ...movie, releaseYear: e.target.value })}
-      />
-
-      <textarea
-        className="border p-2 rounded"
-        placeholder="Description"
-        value={movie.description}
-        onChange={(e) => setMovie({ ...movie, description: e.target.value })}
-      />
-
-      {/* Poster Upload */}
-      <div>
-        <label className="font-semibold">Poster</label>
-        <input
-          type="file"
-          onChange={(e) => uploadImage(e.target.files[0], "posterUrl")}
-          className="block mt-2"
-        />
-        {movie.posterUrl && (
-          <img src={movie.posterUrl} className="w-32 mt-2 rounded" />
-        )}
-      </div>
-
-      {/* Banner Upload */}
-      <div>
-        <label className="font-semibold">Banner</label>
-        <input
-          type="file"
-          onChange={(e) => uploadImage(e.target.files[0], "bannerUrl")}
-          className="block mt-2"
-        />
-        {movie.bannerUrl && (
-          <img src={movie.bannerUrl} className="w-full mt-2 rounded" />
-        )}
-      </div>
-
-      {/* Linked Songs */}
-      <div>
-        <label className="font-semibold">Linked Songs</label>
-        <select
-          multiple
-          className="border p-2 rounded w-full h-32"
-          value={movie.linkedSongs}
-          onChange={(e) =>
-            setMovie({
-              ...movie,
-              linkedSongs: [...e.target.selectedOptions].map((o) => o.value),
-            })
-          }
-        >
-          {songs.map((s) => (
-            <option key={s._id} value={s._id}>
-              {s.songName}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex gap-3">
-        <button className="bg-blue-600 text-white px-4 py-2 rounded">
-          {title}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            resetForm();
-            setMode("list");
-          }}
-          className="bg-gray-500 text-white px-4 py-2 rounded"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-
+  // ---------------------------------------------------------
+  // UI STARTS HERE
+  // ---------------------------------------------------------
   return (
-    <div className="p-6">
-      {/* ✅ Movie List */}
+    <div className="p-6 max-w-6xl mx-auto">
+
+      {/* LIST VIEW */}
       {mode === "list" && (
         <>
+          {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Movies</h2>
+            <h1 className="text-3xl font-bold text-gray-800">🎬 Movies</h1>
+
             <button
               onClick={() => setMode("add")}
-              className="flex items-center bg-blue-600 text-white px-4 py-2 rounded"
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
-              <Plus className="mr-2" /> Add Movie
+              + Add Movie
             </button>
           </div>
 
-          {/* Filters */}
-          <div className="bg-white p-4 rounded shadow grid md:grid-cols-3 gap-4 mb-5">
-            <input
-              className="border p-2 rounded"
-              placeholder="Search movie..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-
-            <input
-              className="border p-2 rounded"
-              placeholder="Language"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            />
-          </div>
-
-          {/* Movies Table */}
-          <div className="bg-white shadow rounded overflow-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-3">Poster</th>
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Language</th>
-                  <th className="p-3">Year</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movies.map((m) => (
-                  <tr key={m._id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">
-                      <img
-                        src={m.posterUrl}
-                        className="w-14 h-20 object-cover rounded"
-                      />
-                    </td>
-                    <td className="p-3 font-semibold">{m.movieName}</td>
-                    <td className="p-3">{m.language}</td>
-                    <td className="p-3">{m.releaseYear}</td>
-                    <td className="p-3 flex justify-end gap-3">
-                      <button
-                        onClick={() => loadMovie(m._id)}
-                        className="text-blue-600"
-                      >
-                        <Edit />
-                      </button>
-                      <button
-                        onClick={() => deleteMovie(m._id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex justify-center mt-5 gap-2">
-            {[...Array(pages).keys()].map((n) => (
-              <button
-                key={n}
-                onClick={() => setPage(n + 1)}
-                className={`px-3 py-1 rounded ${
-                  page === n + 1 ? "bg-blue-600 text-white" : "bg-gray-300"
-                }`}
+          {/* Movie Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {movies.map((m) => (
+              <div
+                key={m._id}
+                className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition"
               >
-                {n + 1}
-              </button>
+                <img
+                  src={m.posterUrl}
+                  alt=""
+                  className="w-full h-60 object-cover rounded-lg"
+                />
+                <h3 className="text-xl font-semibold mt-3">{m.movieName}</h3>
+                <p className="text-sm text-gray-500">{m.genre}</p>
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => loadMovie(m._id)}
+                    className="px-4 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteMovie(m._id)}
+                    className="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </>
       )}
 
-      {/* ✅ Add Movie */}
-      {mode === "add" && <MovieForm title="Add Movie" onSubmit={addMovie} />}
+      {/* ADD / EDIT FORM */}
+      {(mode === "add" || mode === "edit") && (
+        <form
+          onSubmit={mode === "add" ? addMovie : updateMovie}
+          className="bg-white p-6 rounded-xl shadow-md max-w-2xl mx-auto"
+        >
+          <h2 className="text-2xl font-bold mb-4">
+            {mode === "add" ? "Add Movie" : "Edit Movie"}
+          </h2>
 
-      {/* ✅ Edit Movie */}
-      {mode === "edit" && <MovieForm title="Update Movie" onSubmit={updateMovie} />}
+          {/* Input */}
+          <input
+            type="text"
+            name="movieName"
+            placeholder="Movie Name"
+            value={movie.movieName}
+            onChange={handleChange}
+            className="w-full border p-3 rounded mb-3"
+          />
+
+          <input
+            type="text"
+            name="genre"
+            placeholder="Genre"
+            value={movie.genre}
+            onChange={handleChange}
+            className="w-full border p-3 rounded mb-3"
+          />
+
+          <input
+            type="text"
+            name="publishedYear"
+            placeholder="Published Year"
+            value={movie.publishedYear}
+            onChange={handleChange}
+            className="w-full border p-3 rounded mb-3"
+          />
+
+          <input
+            type="text"
+            name="cast"
+            placeholder="Cast (comma separated)"
+            value={movie.cast}
+            onChange={handleChange}
+            className="w-full border p-3 rounded mb-3"
+          />
+
+          <textarea
+            name="description"
+            placeholder="Description"
+            value={movie.description}
+            onChange={handleChange}
+            className="w-full border p-3 rounded mb-3"
+          />
+
+          {/* LINK SONGS */}
+          <label className="font-semibold">Linked Songs</label>
+          <select
+            multiple
+            value={movie.linkedSongs}
+            onChange={handleSongSelect}
+            className="w-full border p-3 rounded mb-3 h-32"
+          >
+            {songs.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.songName}
+              </option>
+            ))}
+          </select>
+
+          {/* Poster Upload */}
+          <label className="font-semibold">Poster</label>
+          <input
+            type="file"
+            onChange={(e) => handleFileChange(e, "posterUrl")}
+            className="w-full border p-3 rounded mb-3"
+          />
+          {movie.posterUrl && (
+            <img
+              src={movie.posterUrl}
+              className="w-40 h-40 object-cover rounded mb-3"
+            />
+          )}
+
+          {/* Banner Upload */}
+          <label className="font-semibold">Banner</label>
+          <input
+            type="file"
+            onChange={(e) => handleFileChange(e, "bannerUrl")}
+            className="w-full border p-3 rounded mb-3"
+          />
+          {movie.bannerUrl && (
+            <img
+              src={movie.bannerUrl}
+              className="w-full h-40 object-cover rounded mb-3"
+            />
+          )}
+
+          <div className="flex gap-4 mt-4">
+            <button
+              type="submit"
+              className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              {mode === "add" ? "Add Movie" : "Update Movie"}
+            </button>
+
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-6 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
-}
+};
+
+export default Movie;
